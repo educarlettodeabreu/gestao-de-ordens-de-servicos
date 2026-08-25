@@ -20,6 +20,8 @@
   "homepage": "https://github.com/educarlettodeabreu/gestao-de-ordens-de-servicos#readme",
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "express": "^5.2.1"
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mysql2": "^3.24.2"
   }
 }
