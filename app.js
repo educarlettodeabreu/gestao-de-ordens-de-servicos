@@ -8,13 +8,21 @@ const db = require("./database.js");
 const port = process.env.PORT;
 app.use(express.json());
 
-// middleware
+// middleware padrao para sessoes!
 
 function verifAutenticacao(req, res, next) {
   if (req.session && req.session.usuarioLogado) {
     return next();
   }
   return res.status(401).json({ erro: "acesso negado!" });
+}
+
+// middleware para verificacao de classe para admin!
+
+function verifAdmin(req, res, next) {
+  if (req.session.usuarioLogado.classe === "admin") return next();
+
+  return res.status(403).json({ erro: "acesso restrito!" });
 }
 
 // configuracao da sessao!
@@ -64,11 +72,48 @@ app.post("/login", (req, res) => {
       req.session.usuarioLogado = {
         id: usuario.id,
         email: usuario.email,
-        tipo: usuario.tipo,
+        classe: usuario.classe,
       };
       return res
         .status(200)
         .json({ mensagem: "usuario logado e sessao criada!" });
+    },
+  );
+});
+
+// rota para cadastro e criacao de contas!
+
+app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
+  const { nome, email, senha, classe } = req.body;
+
+  const hash = await bcrypt.hash(senha, 10);
+
+  db.query(
+    "INSERT INTO users ( nome, email, senha, classe) VALUES ( ?, ?, ?, ?)",
+    [nome, email, hash, classe],
+    async (erro, result) => {
+      if (erro)
+        return res.status(500).json({ erro: "erro ao conectar com servidor!" });
+
+      return res.status(200).json({ mensagem: "conta criada com sucesso!" });
+    },
+  );
+});
+
+// rota para a exclusao de contas!
+
+app.delete("/delet", verifAutenticacao, verifAdmin, (req, res) => {
+  const { email } = req.body;
+
+  db.query(
+    " DELETE FROM users WHERE email = ?",
+    [email],
+    async (erro, result) => {
+      if (erro) return res.status(500).json({ erro: "erro ao excluir conta" });
+
+      return res
+        .status(200)
+        .json({ mensagem: `conta: ${email} exluida com sucesso!` });
     },
   );
 });
