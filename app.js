@@ -25,6 +25,14 @@ function verifAdmin(req, res, next) {
   return res.status(403).json({ erro: "acesso restrito!" });
 }
 
+// middleware para veirificacao de classe para clientes!
+
+function verifCliente(req, res, next) {
+  if (req.session.usuarioLogado.classe === "cliente") return next();
+
+  return res.status(401).json({ mensagem: "acesso negado!" });
+}
+
 // configuracao da sessao!
 
 const sessionOptions = {
@@ -114,6 +122,80 @@ app.delete("/delet", verifAutenticacao, verifAdmin, (req, res) => {
       return res
         .status(200)
         .json({ mensagem: `conta: ${email} exluida com sucesso!` });
+    },
+  );
+});
+
+// rota para a insercao de novos servicos!
+
+app.post("/servicos", verifAutenticacao, verifAdmin, (req, res) => {
+  const { nome } = req.body;
+  db.query(
+    "  INSERT INTO servicos ( nome ) VALUES (?)",
+    [nome],
+    (erro, result) => {
+      if (erro)
+        return res
+          .status(500)
+          .json({ erro: "nao foi possivel adicionar o servico!" });
+
+      return res
+        .status(201)
+        .json({ mensagem: `servico: ${nome} adicionado com sucesso!` });
+    },
+  );
+});
+
+// rota para exclusao de servicos!
+
+app.delete("/servicos/delet", verifAutenticacao, verifAdmin, (req, res) => {
+  const { nome } = req.body;
+
+  db.query("DELETE FROM servicos WHERE nome = ?", [nome], (erro, result) => {
+    if (erro)
+      return res
+        .status(500)
+        .json({ mensagem: `n foi possivel exccluir o servico: ${nome}!` });
+
+    return res
+      .status(200)
+      .json({ mensagem: `servico: ${nome} excluido com sucesso!` });
+  });
+});
+
+// rota para a solicitacao de servisos via cliente!
+
+app.post("/solicitacoes", verifAutenticacao, verifCliente, (req, res) => {
+  const { servicoid, descricao } = req.body;
+  const usuarioid = req.session.usuarioLogado.id;
+
+  db.query(
+    "INSERT INTO solicitacoes (usuario_id, servico_id, descricao) VALUES (?,?,?)",
+    [usuarioid, servicoid, descricao],
+    (erro, result) => {
+      if (erro)
+        return res
+          .status(500)
+          .json({ erro: "nao foi possivel criar a solicitacao!" });
+
+      return res
+        .status(200)
+        .json({ mensagem: "solicitacao criada com sucesso!" });
+    },
+  );
+});
+
+// rota para consultar solicitacoes abertas
+
+app.get("/consulsolicitacoes", verifAutenticacao, verifAdmin, (req, res) => {
+  db.query(
+    "SELECT solicitacoes.id, solicitacoes.descricao, solicitacoes.criado_em, users.nome AS cliente_nome, users.email AS cliente_email, servicos.nome AS servico_nome FROM solicitacoes INNER JOIN users ON solicitacoes.usuario_id = users.id INNER JOIN servicos ON solicitacoes.servico_id = servicos.id",
+    (erro, result) => {
+      if (erro)
+        return res
+          .status(500)
+          .json({ erro: "nao foi possivel consultar as solicitacoes!" });
+      return res.status(200).json(result);
     },
   );
 });
