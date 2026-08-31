@@ -200,6 +200,35 @@ app.get("/consulsolicitacoes", verifAutenticacao, verifAdmin, (req, res) => {
   );
 });
 
+// rota para a criacao de ordens via solicitacoes!
+
+app.post("/ordem", verifAutenticacao, verifAdmin, (req, res) => {
+  const { solicitacoes_id } = req.body;
+
+  db.query(
+    " SELECT FROM solicitacoes WHERE solicitacoes.id = ?",
+    [solicitacoes_id],
+    (erro, result) => {
+      if (erro || result.length === 0)
+        return res.status(500).json({ erro: "solicitacao nao encontrada!" });
+
+      const { usuario_id, servico_id, descricao } = result.res[0];
+
+      db.query(
+        "INSERT INTO ordens (cliente_id, servico_id, descricao) VALUES (?,?,?)",
+        [usuario_id, servico_id, descricao],
+        (erro, ordemRes) => {
+          if (erro)
+            return res
+              .status(500)
+              .json({ erro: "nao foi possivel a criacao da tabela" });
+          const novaOrdem = ordemRes.insertId;
+        },
+      );
+    },
+  );
+});
+
 app.listen(port, () => {
   console.log("servidor rodando na porta 3000!");
 });
