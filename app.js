@@ -163,7 +163,7 @@ app.delete("/servicos/delet", verifAutenticacao, verifAdmin, (req, res) => {
   });
 });
 
-// rota para a solicitacao de servisos via cliente!
+// rota para a criacao de solicitacoes de servisos via cliente!
 
 app.post("/solicitacoes", verifAutenticacao, verifCliente, (req, res) => {
   const { servicoid, descricao } = req.body;
@@ -203,16 +203,16 @@ app.get("/consulsolicitacoes", verifAutenticacao, verifAdmin, (req, res) => {
 // rota para a criacao de ordens via solicitacoes!
 
 app.post("/ordem", verifAutenticacao, verifAdmin, (req, res) => {
-  const { solicitacoes_id } = req.body;
+  const { solicitacao_id, funcionarios } = req.body;
 
   db.query(
-    " SELECT FROM solicitacoes WHERE solicitacoes.id = ?",
-    [solicitacoes_id],
+    " SELECT * FROM solicitacoes WHERE solicitacoes.id = ?",
+    [solicitacao_id],
     (erro, result) => {
       if (erro || result.length === 0)
         return res.status(500).json({ erro: "solicitacao nao encontrada!" });
 
-      const { usuario_id, servico_id, descricao } = result.res[0];
+      const { usuario_id, servico_id, descricao } = result[0];
 
       db.query(
         "INSERT INTO ordens (cliente_id, servico_id, descricao) VALUES (?,?,?)",
@@ -222,12 +222,65 @@ app.post("/ordem", verifAutenticacao, verifAdmin, (req, res) => {
             return res
               .status(500)
               .json({ erro: "nao foi possivel a criacao da tabela" });
-          const novaOrdem = ordemRes.insertId;
+          const novaOrdemId = ordemRes.insertId;
+
+          if (funcionarios && funcionarios.length > 0) {
+            const valores = funcionarios.map((funcId) => [novaOrdemId, funcId]);
+
+            db.query(
+              "INSERT INTO ordem_funcionarios (ordem_id, funcionarios_id) VALUES ?",
+              [valores],
+              (erros) => {
+                if (erros)
+                  return res.status(500).json({
+                    erro: "ordem criada, erro ao adicionar funcionarios!",
+                  });
+
+                db.query("DELETE FROM solicitacoes WHERE id = ?", [
+                  solicitacao_id,
+                ]);
+                return res
+                  .status(201)
+                  .json({ mensagem: "Ordem de servico criada com sucesso!" });
+              },
+            );
+          } else {
+            db.query("DELETE FROM solicitacoes WHERE id = ?", [solicitacao_id]);
+            return res
+              .status(201)
+              .json({ mensagem: "ordem criada sem funcionarios vinculados!" });
+          }
         },
       );
     },
   );
 });
+
+// rota para atualizacao de ordens!
+
+app.patch("/ordem/status", verifAutenticacao, verifAdmin, (req, res) => {
+  const { ordem, status } = req.body;
+
+  db.query(
+    "UPDATE ordens SET status = ? where id = ? ",
+    [status, ordem],
+    (erro, result) => {
+      if (erro)
+        return res.status(500).json({ erro: "erro ao atualizar ordem!" });
+
+      if (result.affectedRows === 0)
+        return res.status(404).json({ erro: "ordem nao encontrada!" });
+
+      return res
+        .status(200)
+        .json({ mensagem: "status atualizado com sucesso!" });
+    },
+  );
+});
+
+// orta para exclusao de ordens!
+
+app.delete("/");
 
 app.listen(port, () => {
   console.log("servidor rodando na porta 3000!");
