@@ -33,6 +33,13 @@ function verifCliente(req, res, next) {
   return res.status(401).json({ mensagem: "acesso negado!" });
 }
 
+// middleware para verificacao de classe para funcionarios!
+
+function verifFuncionarios(req, res, next) {
+  if (req.session.usuarioLogado.classe === "funcionario") return next();
+  return res.status(401).json({ mensagem: "acesso negado!" });
+}
+
 // configuracao da sessao!
 
 const sessionOptions = {
@@ -278,9 +285,40 @@ app.patch("/ordem/status", verifAutenticacao, verifAdmin, (req, res) => {
   );
 });
 
-// orta para exclusao de ordens!
+// rota para exclusao de ordens!
 
-app.delete("/");
+app.delete("/ordem/:id", verifautenticacao, verifAdmin, (req, res) => {
+  const { id } = req.params;
+
+  db.query("DELETE FROM ordens WHERE id = ?", [id], (erro, result) => {
+    if (erro) return res.status(500).json({ erro: "erro ao excluir ordem!" });
+    if (result.affectedRows === 0)
+      return res.status(404).json({ erro: "ordem nao encontrada!" });
+    return res.status(200).json({ mensagem: "ordem excluida com sucesso!" });
+  });
+});
+
+// rota para consultar ordens abertas!
+
+app.get("/consultOrdens", verifAutenticacao, verifAdmin, (req, res) => {
+  const { status } = req.query;
+
+  let query = "SELECT * FROM ordens";
+
+  const params = [];
+
+  if (status) {
+    query += " WHERE status = ?";
+    params.push(status);
+  }
+
+  db.query(query, params, (erro, result) => {
+    if (erro)
+      return res.status(500).json({ erro: "erro ao consultar ordens!" });
+
+    return res.status(200).json(result);
+  });
+});
 
 app.listen(port, () => {
   console.log("servidor rodando na porta 3000!");
