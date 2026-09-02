@@ -96,6 +96,19 @@ app.post("/login", (req, res) => {
   );
 });
 
+// rota para logout!
+
+app.post("/logout", verifAutenticacao, (req, res) => {
+  req.session.destroy((erro) => {
+    if (erro)
+      return res.status(500).json({ erro: "erro ao encerrar a sessao!" });
+
+    res.clearCookie("cookie_sessao_id");
+
+    return res.status(200).json({ mensagem: "sessao encerrada com sucesso!" });
+  });
+});
+
 // rota para cadastro e criacao de contas!
 
 app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
@@ -110,6 +123,26 @@ app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
       if (erro)
         return res.status(500).json({ erro: "erro ao conectar com servidor!" });
 
+      return res.status(200).json({ mensagem: "conta criada com sucesso!" });
+    },
+  );
+});
+
+// rota publica para a criacao de contas para clientes!
+
+app.post("/criarConta", async (req, res) => {
+  const { nome, email, senha } = req.body;
+
+  const hash = await bcrypt.hash(senha, 10);
+
+  db.query(
+    "INSERT INTO users (nome, email, senha) VALUES (?,?,?)",
+    [nome, email, hash],
+    async (erro, result) => {
+      if (erro)
+        return res
+          .status(500)
+          .json({ erro: "erro ao conectar com o servidor!" });
       return res.status(200).json({ mensagem: "conta criada com sucesso!" });
     },
   );
@@ -170,6 +203,17 @@ app.delete("/servicos/delet", verifAutenticacao, verifAdmin, (req, res) => {
   });
 });
 
+// orta para a consulta de servicos disponiveis!
+
+app.get("/servicos", verifAutenticacao, (req, res) => {
+  db.query("SELECT * FROM servicos", (erro, result) => {
+    if (erro)
+      return res.status(500).json({ erro: "erro ao consultar servicos!" });
+
+    return res.status(200).json(result);
+  });
+});
+
 // rota para a criacao de solicitacoes de servisos via cliente!
 
 app.post("/solicitacoes", verifAutenticacao, verifCliente, (req, res) => {
@@ -202,6 +246,23 @@ app.get("/consulsolicitacoes", verifAutenticacao, verifAdmin, (req, res) => {
         return res
           .status(500)
           .json({ erro: "nao foi possivel consultar as solicitacoes!" });
+      return res.status(200).json(result);
+    },
+  );
+});
+
+// rota para apenas clientes consultar suas solicitacoes!
+
+app.get("/minhassolicitacoes", verifAutenticacao, verifCliente, (req, res) => {
+  const usuarioId = req.session.usuarioLogado.id;
+
+  db.query(
+    "SELECT * FROM solicitacoes WHERE usuario_id = ?",
+    [usuarioId],
+    (erro, result) => {
+      if (erro)
+        return res.status(500).json({ erro: "erro ao consultar solicitacoes" });
+
       return res.status(200).json(result);
     },
   );
@@ -287,7 +348,7 @@ app.patch("/ordem/status", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para exclusao de ordens!
 
-app.delete("/ordem/:id", verifautenticacao, verifAdmin, (req, res) => {
+app.delete("/ordem/:id", verifAutenticacao, verifAdmin, (req, res) => {
   const { id } = req.params;
 
   db.query("DELETE FROM ordens WHERE id = ?", [id], (erro, result) => {
@@ -319,6 +380,45 @@ app.get("/consultOrdens", verifAutenticacao, verifAdmin, (req, res) => {
     return res.status(200).json(result);
   });
 });
+
+// rota para consultar ordens do cliente logado!
+
+app.get("/minhasordens", verifAutenticacao, verifCliente, (req, res) => {
+  const usuarioId = req.session.usuarioLogado.id;
+
+  db.query(
+    "SELECT * FROM ordens WHERE cliente_id = ?",
+    [usuarioId],
+    (erro, result) => {
+      if (erro)
+        return res.status(500).json({ erro: "erro ao consultar ordens!" });
+
+      return res.status(200).json(result);
+    },
+  );
+});
+
+// rota para consultar ordens do funcionario logado!
+
+app.get(
+  "/funcionario/ordens",
+  verifAutenticacao,
+  verifFuncionarios,
+  (req, res) => {
+    const funcionarioId = req.session.usuarioLogado.id;
+
+    db.query(
+      "SELECT ordens.* FROM ordens JOIN ordem_funcionarios ON ordens.id = ordem_funcionarios.ordem_id WHERE ordem_funcionarios.funcionarios_id = ?",
+      [funcionarioId],
+      (erro, result) => {
+        if (erro)
+          return res.status(500).json({ erro: "erro ao consultar ordens!" });
+
+        res.status(200).json(result);
+      },
+    );
+  },
+);
 
 app.listen(port, () => {
   console.log("servidor rodando na porta 3000!");
