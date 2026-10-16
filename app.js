@@ -1,4 +1,6 @@
 require("dotenv").config();
+const fs = require("fs")
+const path = require("path")
 const rateLimit = require("express-rate-limit")
 const helmet = require("helmet")
 const express = require("express");
@@ -151,7 +153,7 @@ app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
 
 // rota publica para a criacao de contas para clientes!
 
-app.post("/criarConta", rateLimit, async (req, res) => {
+app.post("/criarConta", loginLimiter, async (req, res) => {
   const { nome, email, senha } = req.body;
 
   const hash = await bcrypt.hash(senha, 10);
