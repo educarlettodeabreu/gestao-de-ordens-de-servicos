@@ -5,6 +5,7 @@ const path = require("path");
 
 // criando a conexao com banco de dados por meio da biblioteca mysql2
 
+const caPath = process.env.CA_PATH || path.join(__dirname, "ca.pem")
 const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -13,7 +14,7 @@ const connection = mysql.createConnection({
   port: process.env.DB_PORT,
 
   ssl: {
-    ca: fs.readFileSync(path.join(__dirname, "ca.pem")),
+    ca: fs.readFileSync(caPath),
   },
 });
 

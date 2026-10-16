@@ -8,7 +8,7 @@ const bcrypt = require("bcrypt");
 const app = express();
 const db = require("./database.js");
 const port = process.env.PORT;
-app.use(express.json());
+app.use(express.json({ limit: "50kb"}));
 app.use(helmet())
 
 // limite de requisicoes!
@@ -54,12 +54,19 @@ function verifFuncionarios(req, res, next) {
 
 // configuracao da sessao!
 
+const caPath =
+  process.env.CA_PATH || path.join(__dirname, "ca.pem");
+
 const sessionOptions = {
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
+
+  ssl: {
+    ca: fs.readFileSync(caPath)
+  }
 };
 
 const sessionStore = new MySQLStore(sessionOptions);
@@ -89,14 +96,14 @@ app.post("/login", loginLimiter, (req, res) => {
       if (erro) return res.status(500).json({ erro: "erro no servidor" });
 
       if (result.length === 0)
-        return res.status(401).json({ erro: "usuario nao encontrado!" });
+        return res.status(401).json({ erro: "email ou senha incorretos!" });
 
       const usuario = result[0];
 
       const senhaValida = await bcrypt.compare(senha, usuario.senha);
 
       if (!senhaValida) {
-        return res.status(401).json({ erro: "senha incorreta" });
+        return res.status(401).json({ erro: "email ou senha incorretos!" });
       }
       req.session.usuarioLogado = {
         id: usuario.id,
@@ -144,7 +151,7 @@ app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
 
 // rota publica para a criacao de contas para clientes!
 
-app.post("/criarConta", async (req, res) => {
+app.post("/criarConta", rateLimit, async (req, res) => {
   const { nome, email, senha } = req.body;
 
   const hash = await bcrypt.hash(senha, 10);
