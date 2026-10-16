@@ -1,4 +1,6 @@
 require("dotenv").config();
+const rateLimit = require("express-rate-limit")
+const helmet = require("helmet")
 const express = require("express");
 const session = require("express-session");
 const MySQLStore = require("express-mysql-session")(session);
@@ -7,6 +9,16 @@ const app = express();
 const db = require("./database.js");
 const port = process.env.PORT;
 app.use(express.json());
+app.use(helmet())
+
+// limite de requisicoes!
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 6,
+  message:  { erro: "muitas tentativas, tente novamente mais tarde" 
+  }
+})
 
 // middleware padrao para sessoes!
 
@@ -52,6 +64,8 @@ const sessionOptions = {
 
 const sessionStore = new MySQLStore(sessionOptions);
 
+app.set("trust proxy", 1);
+
 app.use(
   session({
     key: "cookie_sessao_id",
@@ -59,13 +73,13 @@ app.use(
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 24, secure: false, httpOnly: true },
+    cookie: { maxAge: 1000 * 60 * 60 * 24, secure: true, httpOnly: true, sameSite: "lax" },
   }),
 );
 
 // rota de autenticacao!
 
-app.post("/login", (req, res) => {
+app.post("/login", loginLimiter, (req, res) => {
   const { email, senha } = req.body;
 
   db.query(
