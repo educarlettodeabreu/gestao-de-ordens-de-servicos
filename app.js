@@ -444,5 +444,5 @@ app.get(
 );
 
 app.listen(port, () => {
-  console.log("servidor rodando na porta 3000!");
+  console.log(`servidor rodando na porta ${port}!`);
 });
