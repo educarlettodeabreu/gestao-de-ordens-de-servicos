@@ -1,4 +1,9 @@
 require("dotenv").config();
+const validar = require("./validar")
+const {
+  loginSchema,
+  cadastroSchema
+} = require("./schemas.js")
 const fs = require("fs")
 const path = require("path")
 const rateLimit = require("express-rate-limit")
@@ -88,7 +93,7 @@ app.use(
 
 // rota de autenticacao!
 
-app.post("/login", loginLimiter, (req, res) => {
+app.post("/login", loginLimiter, validar(loginSchema), (req, res) => {
   const { email, senha } = req.body;
 
   db.query(
@@ -153,7 +158,7 @@ app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
 
 // rota publica para a criacao de contas para clientes!
 
-app.post("/criarConta", loginLimiter, async (req, res) => {
+app.post("/criarConta", loginLimiter, validar(cadastroSchema), async (req, res) => {
   const { nome, email, senha } = req.body;
 
   const hash = await bcrypt.hash(senha, 10);
