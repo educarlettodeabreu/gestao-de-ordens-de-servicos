@@ -124,6 +124,34 @@ app.post("/login", loginLimiter, validar(loginSchema), (req, res) => {
   );
 });
 
+// rota para consultar o usuario autenticado!
+
+app.get("/me", verifAutenticacao, (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const usuarioId = req.session.usuarioLogado.id;
+
+  if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) {
+    return res.status(401).json({ erro: "sessao invalida!" });
+  }
+
+  db.query(
+    "SELECT id, nome, email, classe FROM users WHERE id = ?",
+    [usuarioId],
+    (erro, result) => {
+      if (erro) {
+        return res.status(500).json({ erro: "erro ao consultar usuario!" });
+      }
+
+      if (result.length === 0) {
+        return res.status(401).json({ erro: "sessao invalida!" });
+      }
+
+      const { id, nome, email, classe } = result[0];
+      return res.status(200).json({ id, nome, email, classe });
+    },
+  );
+});
+
 // rota para logout!
 
 app.post("/logout", verifAutenticacao, (req, res) => {
@@ -135,6 +163,23 @@ app.post("/logout", verifAutenticacao, (req, res) => {
 
     return res.status(200).json({ mensagem: "sessao encerrada com sucesso!" });
   });
+});
+
+// rota administrativa para selecionar funcionarios!
+
+app.get("/admin/funcionarios", verifAutenticacao, verifAdmin, (req, res) => {
+  res.set("Cache-Control", "no-store");
+  db.query(
+    "SELECT id, nome, email FROM users WHERE classe = ? ORDER BY nome, id",
+    ["funcionario"],
+    (erro, result) => {
+      if (erro) {
+        return res.status(500).json({ erro: "erro ao consultar funcionarios!" });
+      }
+
+      return res.status(200).json(result.map(({ id, nome, email }) => ({ id, nome, email })));
+    },
+  );
 });
 
 // rota para cadastro e criacao de contas!
