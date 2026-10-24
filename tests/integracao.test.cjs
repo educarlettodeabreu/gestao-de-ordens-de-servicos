@@ -4,6 +4,7 @@ const { createServer } = require("node:http");
 const { once } = require("node:events");
 const { spawn } = require("node:child_process");
 const path = require("node:path");
+const { gzipSync, deflateSync, brotliCompressSync } = require("node:zlib");
 const { criarAplicacao } = require("./helpers/aplicacao.cjs");
 
 async function cenario(t) {
@@ -175,6 +176,25 @@ test("rate limiting continua ativo no login sob /api", async (t) => {
   }
   const res = await solicitar("/api/login", { metodo: "POST", dados: { email: "ausente@example.com", senha: "incorreta" } });
   assert.equal(res.status, 429); assert.match(res.headers.get("content-type"), /application\/json/);
+});
+
+test("corpos comprimidos com bytes excedentes não derrubam o processo", async (t) => {
+  const { solicitar, origem } = await cenario(t);
+  const json = Buffer.from(JSON.stringify({ email: "ausente@example.com", senha: "incorreta" }));
+  for (const [encoding, comprimir] of [["gzip", gzipSync], ["deflate", deflateSync], ["br", brotliCompressSync]]) {
+    const quadro = comprimir(json);
+    const enviar = (body) => fetch(`${origem}/api/login`, {
+      method: "POST", headers: { "Content-Type": "application/json", "Content-Encoding": encoding }, body,
+    });
+    const normal = await enviar(quadro);
+    assert.equal(normal.status, 401, `Compressão ${encoding} continua suportada.`);
+    await normal.arrayBuffer();
+    const excedente = await enviar(Buffer.concat([quadro, Buffer.from("bytes-excedentes")]));
+    assert.ok([400, 401].includes(excedente.status), `${encoding}: resposta controlada.`);
+    assert.match(excedente.headers.get("content-type"), /application\/json/);
+    await excedente.arrayBuffer();
+    assert.equal((await solicitar("/api/me")).status, 401, `Servidor continua respondendo após ${encoding}.`);
+  }
 });
 
 test("npm start inicia somente o Express e serve a SPA sem MySQL real no teste", { timeout: 15000 }, async (t) => {

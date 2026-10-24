@@ -12,6 +12,8 @@ Arquivos criados/modificados:
 
 - `app.js`: Router `/api`, frontend estático, fallback da SPA, erros JSON e porta.
 - `package.json`, `package-lock.json`, `.node-version`: comandos na raiz e Node 24.
+  O lockfile também atualiza apenas o `body-parser` indireto para 2.4.0, dentro
+  da faixa já permitida pelo Express, corrigindo a auditoria de segurança.
 - `.gitignore` e `.env.example`: exclusão de arquivos privados e modelo sem secrets.
 - `.gitattributes`: mantém os patches históricos do frontend sem alterar seus
   espaços de contexto exigidos pelo formato de diff unificado.
@@ -215,7 +217,7 @@ Resultados nesta revisão:
 | --- | --- |
 | `npm ci` e `npm run build`, Node 24.22.1 | Aprovados |
 | `npm run lint` | Aprovado |
-| `npm test` | 9 testes novos do backend e 88 existentes do frontend aprovados |
+| `npm test` | 10 testes novos do backend e 88 existentes do frontend aprovados |
 | `npm run test:http` | 28 verificações aprovadas, com banco/store substituídos |
 | Navegador integrado HTTPS | 26 verificações aprovadas, incluindo proxy local; sem erros JS, falhas de assets ou violações CSP |
 | Navegador existente do frontend | 42 verificações aprovadas a partir da nova raiz, com APIs controladas somente nesse teste |
@@ -226,6 +228,15 @@ o HTML React em `/login` e 401 de `/api/me` sem sessão. Os testes HTTP também
 verificaram JS/CSS, páginas diretas e todos os endpoints e permissões preservados.
 
 ## Pendências antes de liberar usuários reais
+
+A auditoria final identificou o aviso alto
+[GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828) no
+`body-parser` 2.3.0 já presente. Foi atualizado pontualmente para 2.4.0 no
+lockfile, sem adicionar dependência direta nem alterar a API. Foi incluído teste
+de regressão com gzip, deflate e Brotli contendo bytes excedentes, verificando
+respostas controladas e a continuidade do servidor. Após a correção, a auditoria
+do backend não apontou vulnerabilidades conhecidas nessa execução; isso não
+substitui as pendências abaixo ou uma revisão completa de segurança.
 
 - Implementar e testar CSRF nas mutações e login/logout. Mesma origem e SameSite
   não substituem uma política CSRF do servidor; CORS não é proteção CSRF.
