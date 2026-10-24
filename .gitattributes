@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Patches unificados usam um espaço como prefixo de linhas vazias de contexto.
+frontend/docs/backend/*.patch whitespace=-blank-at-eol

@@ -5,7 +5,14 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm --prefix frontend ci --include=dev && npm --prefix frontend run build",
+    "dev": "node --watch app.js",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "lint": "node --check app.js && node --check database.js && node --check schemas.js && node --check validar.js && npm --prefix frontend run lint",
+    "test": "node --test tests/*.test.cjs && npm --prefix frontend test",
+    "test:http": "node frontend/tests/backend-http.mjs .",
+    "test:browser": "node frontend/tests/browser-check.mjs",
+    "test:production": "node tests/producao-browser.mjs"
   },
   "repository": {
     "type": "git",
@@ -34,5 +41,8 @@
     "express-mysql-session": {
       "mysql2": "^3.24.2"
     }
+  },
+  "engines": {
+    "node": ">=24.22.1 <25"
   }
 }

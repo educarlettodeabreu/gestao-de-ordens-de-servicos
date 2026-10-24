@@ -13,10 +13,16 @@ const session = require("express-session");
 const MySQLStore = require("express-mysql-session")(session);
 const bcrypt = require("bcrypt");
 const app = express();
+const api = express.Router();
+const frontendDist = path.join(__dirname, "frontend", "dist");
 const db = require("./database.js");
-const port = process.env.PORT;
-app.use(express.json({ limit: "50kb"}));
-app.use(helmet())
+const port = process.env.PORT || 3000;
+app.use(helmet());
+api.use((_req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
+api.use(express.json({ limit: "50kb" }));
 
 // limite de requisicoes!
 
@@ -80,7 +86,7 @@ const sessionStore = new MySQLStore(sessionOptions);
 
 app.set("trust proxy", 1);
 
-app.use(
+api.use(
   session({
     key: "cookie_sessao_id",
     secret: process.env.SESSION_SECRET,
@@ -93,7 +99,7 @@ app.use(
 
 // rota de autenticacao!
 
-app.post("/login", loginLimiter, validar(loginSchema), (req, res) => {
+api.post("/login", loginLimiter, validar(loginSchema), (req, res) => {
   const { email, senha } = req.body;
 
   db.query(
@@ -126,7 +132,7 @@ app.post("/login", loginLimiter, validar(loginSchema), (req, res) => {
 
 // rota para consultar o usuario autenticado!
 
-app.get("/me", verifAutenticacao, (req, res) => {
+api.get("/me", verifAutenticacao, (req, res) => {
   res.set("Cache-Control", "no-store");
   const usuarioId = req.session.usuarioLogado.id;
 
@@ -154,7 +160,7 @@ app.get("/me", verifAutenticacao, (req, res) => {
 
 // rota para logout!
 
-app.post("/logout", verifAutenticacao, (req, res) => {
+api.post("/logout", verifAutenticacao, (req, res) => {
   req.session.destroy((erro) => {
     if (erro)
       return res.status(500).json({ erro: "erro ao encerrar a sessao!" });
@@ -167,7 +173,7 @@ app.post("/logout", verifAutenticacao, (req, res) => {
 
 // rota administrativa para selecionar funcionarios!
 
-app.get("/admin/funcionarios", verifAutenticacao, verifAdmin, (req, res) => {
+api.get("/admin/funcionarios", verifAutenticacao, verifAdmin, (req, res) => {
   res.set("Cache-Control", "no-store");
   db.query(
     "SELECT id, nome, email FROM users WHERE classe = ? ORDER BY nome, id",
@@ -184,7 +190,7 @@ app.get("/admin/funcionarios", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para cadastro e criacao de contas!
 
-app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
+api.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
   const { nome, email, senha, classe } = req.body;
 
   const hash = await bcrypt.hash(senha, 10);
@@ -203,7 +209,7 @@ app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
 
 // rota publica para a criacao de contas para clientes!
 
-app.post("/criarConta", loginLimiter, validar(cadastroSchema), async (req, res) => {
+api.post("/criarConta", loginLimiter, validar(cadastroSchema), async (req, res) => {
   const { nome, email, senha } = req.body;
 
   const hash = await bcrypt.hash(senha, 10);
@@ -223,7 +229,7 @@ app.post("/criarConta", loginLimiter, validar(cadastroSchema), async (req, res) 
 
 // rota para a exclusao de contas!
 
-app.delete("/delet", verifAutenticacao, verifAdmin, (req, res) => {
+api.delete("/delet", verifAutenticacao, verifAdmin, (req, res) => {
   const { email } = req.body;
 
   db.query(
@@ -241,7 +247,7 @@ app.delete("/delet", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para a insercao de novos servicos!
 
-app.post("/servicos", verifAutenticacao, verifAdmin, (req, res) => {
+api.post("/servicos", verifAutenticacao, verifAdmin, (req, res) => {
   const { nome } = req.body;
   db.query(
     "  INSERT INTO servicos ( nome ) VALUES (?)",
@@ -261,7 +267,7 @@ app.post("/servicos", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para exclusao de servicos!
 
-app.delete("/servicos/delet", verifAutenticacao, verifAdmin, (req, res) => {
+api.delete("/servicos/delet", verifAutenticacao, verifAdmin, (req, res) => {
   const { nome } = req.body;
 
   db.query("DELETE FROM servicos WHERE nome = ?", [nome], (erro, result) => {
@@ -278,7 +284,7 @@ app.delete("/servicos/delet", verifAutenticacao, verifAdmin, (req, res) => {
 
 // orta para a consulta de servicos disponiveis!
 
-app.get("/servicos", verifAutenticacao, (req, res) => {
+api.get("/servicos", verifAutenticacao, (req, res) => {
   db.query("SELECT * FROM servicos", (erro, result) => {
     if (erro)
       return res.status(500).json({ erro: "erro ao consultar servicos!" });
@@ -289,7 +295,7 @@ app.get("/servicos", verifAutenticacao, (req, res) => {
 
 // rota para a criacao de solicitacoes de servisos via cliente!
 
-app.post("/solicitacoes", verifAutenticacao, verifCliente, (req, res) => {
+api.post("/solicitacoes", verifAutenticacao, verifCliente, (req, res) => {
   const { servicoid, descricao } = req.body;
   const usuarioid = req.session.usuarioLogado.id;
 
@@ -311,7 +317,7 @@ app.post("/solicitacoes", verifAutenticacao, verifCliente, (req, res) => {
 
 // rota para consultar solicitacoes abertas
 
-app.get("/consulsolicitacoes", verifAutenticacao, verifAdmin, (req, res) => {
+api.get("/consulsolicitacoes", verifAutenticacao, verifAdmin, (req, res) => {
   db.query(
     "SELECT solicitacoes.id, solicitacoes.descricao, solicitacoes.criado_em, users.nome AS cliente_nome, users.email AS cliente_email, servicos.nome AS servico_nome FROM solicitacoes INNER JOIN users ON solicitacoes.usuario_id = users.id INNER JOIN servicos ON solicitacoes.servico_id = servicos.id",
     (erro, result) => {
@@ -326,7 +332,7 @@ app.get("/consulsolicitacoes", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para apenas clientes consultar suas solicitacoes!
 
-app.get("/minhassolicitacoes", verifAutenticacao, verifCliente, (req, res) => {
+api.get("/minhassolicitacoes", verifAutenticacao, verifCliente, (req, res) => {
   const usuarioId = req.session.usuarioLogado.id;
 
   db.query(
@@ -343,7 +349,7 @@ app.get("/minhassolicitacoes", verifAutenticacao, verifCliente, (req, res) => {
 
 // rota para a criacao de ordens via solicitacoes!
 
-app.post("/ordem", verifAutenticacao, verifAdmin, (req, res) => {
+api.post("/ordem", verifAutenticacao, verifAdmin, (req, res) => {
   const { solicitacao_id, funcionarios } = req.body;
 
   db.query(
@@ -399,7 +405,7 @@ app.post("/ordem", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para atualizacao de ordens!
 
-app.patch("/ordem/status", verifAutenticacao, verifAdmin, (req, res) => {
+api.patch("/ordem/status", verifAutenticacao, verifAdmin, (req, res) => {
   const { ordem, status } = req.body;
 
   db.query(
@@ -421,7 +427,7 @@ app.patch("/ordem/status", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para exclusao de ordens!
 
-app.delete("/ordem/:id", verifAutenticacao, verifAdmin, (req, res) => {
+api.delete("/ordem/:id", verifAutenticacao, verifAdmin, (req, res) => {
   const { id } = req.params;
 
   db.query("DELETE FROM ordens WHERE id = ?", [id], (erro, result) => {
@@ -434,7 +440,7 @@ app.delete("/ordem/:id", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para consultar ordens abertas!
 
-app.get("/consultOrdens", verifAutenticacao, verifAdmin, (req, res) => {
+api.get("/consultOrdens", verifAutenticacao, verifAdmin, (req, res) => {
   const { status } = req.query;
 
   let query = "SELECT * FROM ordens";
@@ -456,7 +462,7 @@ app.get("/consultOrdens", verifAutenticacao, verifAdmin, (req, res) => {
 
 // rota para consultar ordens do cliente logado!
 
-app.get("/minhasordens", verifAutenticacao, verifCliente, (req, res) => {
+api.get("/minhasordens", verifAutenticacao, verifCliente, (req, res) => {
   const usuarioId = req.session.usuarioLogado.id;
 
   db.query(
@@ -473,7 +479,7 @@ app.get("/minhasordens", verifAutenticacao, verifCliente, (req, res) => {
 
 // rota para consultar ordens do funcionario logado!
 
-app.get(
+api.get(
   "/funcionario/ordens",
   verifAutenticacao,
   verifFuncionarios,
@@ -493,6 +499,49 @@ app.get(
   },
 );
 
-app.listen(port, () => {
-  console.log(`servidor rodando na porta ${port}!`);
+// A API tem prioridade e nunca entrega o HTML da aplicação React.
+app.use("/api", api);
+app.use((req, res, next) => {
+  if (req.path.toLowerCase().startsWith("/api")) {
+    return res.status(404).json({ erro: "Rota da API não encontrada." });
+  }
+  next();
 });
+
+// Somente os arquivos compilados são públicos; nunca sirva a raiz do backend.
+app.use(express.static(frontendDist, { index: false, dotfiles: "deny" }));
+
+// No Express 5, o wildcard precisa de nome e chaves para incluir também "/".
+app.get("/{*pagina}", (req, res, next) => {
+  const partes = req.params.pagina || [];
+  if (!req.accepts("html") || partes.some((parte) => parte.startsWith(".") || path.extname(parte))) {
+    return next();
+  }
+
+  res.set("Cache-Control", "no-store");
+  return res.sendFile(path.join(frontendDist, "index.html"), (erro) => {
+    if (erro) next(erro);
+  });
+});
+
+app.use((_req, res) => {
+  return res.status(404).json({ erro: "Recurso não encontrado." });
+});
+
+// Erros de JSON, tamanho do corpo e erros internos também não expõem HTML/stack.
+app.use((erro, _req, res, next) => {
+  if (res.headersSent) return next(erro);
+  const status = Number.isInteger(erro.status) && erro.status >= 400 && erro.status < 500
+    ? erro.status : 500;
+  return res.status(status).json({
+    erro: status === 500 ? "Erro interno do servidor." : "Não foi possível processar a requisição.",
+  });
+});
+
+module.exports = app;
+
+if (require.main === module) {
+  const servidor = app.listen(port, "0.0.0.0", () => {
+    console.log(`servidor rodando na porta ${servidor.address().port}!`);
+  });
+}

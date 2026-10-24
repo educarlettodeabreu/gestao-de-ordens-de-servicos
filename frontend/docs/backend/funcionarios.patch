@@ -1,0 +1,26 @@
+--- a/app.js
++++ b/app.js
+@@ -137,6 +137,23 @@
+   });
+ });
+ 
++// rota administrativa para selecionar funcionarios!
++
++app.get("/admin/funcionarios", verifAutenticacao, verifAdmin, (req, res) => {
++  res.set("Cache-Control", "no-store");
++  db.query(
++    "SELECT id, nome, email FROM users WHERE classe = ? ORDER BY nome, id",
++    ["funcionario"],
++    (erro, result) => {
++      if (erro) {
++        return res.status(500).json({ erro: "erro ao consultar funcionarios!" });
++      }
++
++      return res.status(200).json(result.map(({ id, nome, email }) => ({ id, nome, email })));
++    },
++  );
++});
++
+ // rota para cadastro e criacao de contas!
+ 
+ app.post("/cadastro", verifAutenticacao, verifAdmin, async (req, res) => {
